@@ -16,11 +16,12 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-ai_context: ai.Messages = []
+ai_contexts: dict[int, ai.Messages] = {}
 
 async def ai_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global ai_context
-    response, ai_context = ai.send_text_request(cast(str, cast(Message, update.effective_message).text), ai_context)
+    global ai_contexts
+    id: int = context.bot.id
+    response, ai_contexts[id] = ai.send_text_request(cast(str, cast(Message, update.effective_message).text), ai_contexts.setdefault(id, []))
     await context.bot.send_message(chat_id=cast(Chat, update.effective_chat).id, text=response)
 
 async def ai_voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -35,8 +36,9 @@ async def ai_voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(chat_id=cast(Chat, update.effective_chat).id, text=f'Ваше сообщение распознано как: "{transcription}"')
 
-    global ai_context
-    response, ai_context = ai.send_text_request(transcription, ai_context)
+    global ai_contexts
+    id: int = context.bot.id
+    response, ai_contexts[id] = ai.send_text_request(transcription, ai_contexts.setdefault(id, []))
     await context.bot.send_message(chat_id=cast(Chat, update.effective_chat).id, text=response)
 
 async def is_bot_mentioned(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -92,7 +94,6 @@ if __name__ == '__main__':
     print("Запуск бота...")
     run_bot(admin_ids)
 
-# TODO: отдельный контекст для каждого пользователя
 # TODO: переключение между модельками прямо в чате Telegram
 # TODO: новая моделька в ProxyAPI - Claude
 # TODO: первоначальная настройка бота и сохранение настроек в файл settings.json
