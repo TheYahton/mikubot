@@ -1,2 +1,3 @@
+aiohttp
+asyncio
 python-telegram-bot
-requests

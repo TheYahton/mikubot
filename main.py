@@ -26,7 +26,7 @@ async def ai_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global ai_contexts
     id: int = update.effective_message.from_user.id
     ai_context = ai_contexts.setdefault(id, ai.DefaultAiContext())
-    response = ai_context.send_text(update.effective_message.text)
+    response = await ai_context.send_text(update.effective_message.text)
     await context.bot.send_message(chat_id=cast(Chat, update.effective_chat).id, text=response)
 
 async def ai_voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -41,7 +41,7 @@ async def ai_voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global ai_contexts
     id: int = update.message.from_user.id
     ai_context = ai_contexts.setdefault(id, ai.DefaultAiContext())
-    (response, transcription) = ai_context.send_voice(audio_content)
+    (response, transcription) = await ai_context.send_voice(audio_content)
     await context.bot.send_message(chat_id=cast(Chat, update.effective_chat).id, text=f'Ваше сообщение распознано как: "{transcription}"')
     await context.bot.send_message(chat_id=cast(Chat, update.effective_chat).id, text=response)
 
@@ -68,7 +68,7 @@ def run_bot(admin_ids: list[int]) -> None:
     if BOT_TOKEN is None:
         raise ValueError("BOT_TOKEN env var is None.")
 
-    request = telegram.request.HTTPXRequest()
+    request = telegram.request.HTTPXRequest(connection_pool_size=16)
 
     application = ApplicationBuilder()\
         .request(request)\
@@ -107,4 +107,3 @@ if __name__ == '__main__':
 # TODO: инструктаж бота через системные промпты для улучшения ответов и придания личности Хацунэ Мику.
 # TODO: озвучивание исходящих сообщений и отправка через Telegram голосом Хацуне Мику
 # TODO: голосовые звонки (???)
-# TODO: асинхронные запросы к моделькам
