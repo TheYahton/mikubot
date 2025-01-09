@@ -16,29 +16,33 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-ai_contexts: dict[int, ai.Messages] = {}
+type UserID = int
+ai_contexts: dict[UserID, ai.AiContext] = {}
 
 async def ai_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_message is None or update.effective_message.text is None or update.effective_message.from_user is None:
+        return
+
     global ai_contexts
-    id: int = context.bot.id
-    response, ai_contexts[id] = ai.send_text_request(cast(str, cast(Message, update.effective_message).text), ai_contexts.setdefault(id, []))
+    id: int = update.effective_message.from_user.id
+    ai_context = ai_contexts.setdefault(id, ai.DefaultAiContext())
+    response = ai_context.send_text(update.effective_message.text)
     await context.bot.send_message(chat_id=cast(Chat, update.effective_chat).id, text=response)
 
 async def ai_voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message is None or update.message.voice is None or update.message.voice.mime_type is None:
+    if update.message is None or update.message.voice is None or update.message.voice.mime_type is None or update.message.from_user is None:
         return
 
     voice = update.message.voice
     mime_type = update.message.voice.mime_type
     file: telegram.File = await voice.get_file()
     audio_content = await file.download_as_bytearray()
-    transcription = ai.send_transcription_request("example.ogg", audio_content)
-
-    await context.bot.send_message(chat_id=cast(Chat, update.effective_chat).id, text=f'Ваше сообщение распознано как: "{transcription}"')
 
     global ai_contexts
-    id: int = context.bot.id
-    response, ai_contexts[id] = ai.send_text_request(transcription, ai_contexts.setdefault(id, []))
+    id: int = update.message.from_user.id
+    ai_context = ai_contexts.setdefault(id, ai.DefaultAiContext())
+    (response, transcription) = ai_context.send_voice(audio_content)
+    await context.bot.send_message(chat_id=cast(Chat, update.effective_chat).id, text=f'Ваше сообщение распознано как: "{transcription}"')
     await context.bot.send_message(chat_id=cast(Chat, update.effective_chat).id, text=response)
 
 async def is_bot_mentioned(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -64,7 +68,7 @@ def run_bot(admin_ids: list[int]) -> None:
     if BOT_TOKEN is None:
         raise ValueError("BOT_TOKEN env var is None.")
 
-    request = telegram.request.HTTPXRequest(proxy=getenv("PROXY_URL"))
+    request = telegram.request.HTTPXRequest()
 
     application = ApplicationBuilder()\
         .request(request)\
