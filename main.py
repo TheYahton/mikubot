@@ -1,5 +1,6 @@
 import base64
 import io
+import json
 import os
 from os import getenv
 from typing import cast
@@ -90,13 +91,34 @@ def run_bot(admin_ids: list[int]) -> None:
     
     application.run_polling()
 
+def initial_setup() -> None:
+    try:
+        print("Сейчас мы пройдем первоначальную найстроку. Вы будете отвечать на заданные вопросы.")
+        print("Пожалуйста, перечислите ID администраторов через запятую.")
+        print('Примеры: "12462, 210582, 23366" или "1235,22,771"')
+        admin_ids: list[int] = list(map(int, input(": ").replace(" ", "").split(",")))
+        settings = {
+            "admin_ids": admin_ids
+        }
+        print("Запись файла `settings.json`...")
+        with open("settings.json", "w") as f:
+            f.write(json.dumps(settings))
+        print("Файл `settings.json` успешно записан.")
+        print("Первоначальная настройка закончена.")
+    except KeyboardInterrupt:
+        print("Первоначальная настройка прервана.")
+
 if __name__ == '__main__':
-    print("Добро пожаловать в систему MikuSystem!")
-    print("Пожалуйста, перечислите ID администраторов через запятую.")
-    print('Примеры: "12462, 210582, 23366" или "1235,22,771"')
-    admin_ids: list[int] = list(map(int, input(": ").replace(" ", "").split(",")))
-    print("Запуск бота...")
-    run_bot(admin_ids)
+    try:
+        with open("settings.json") as f:
+            settings = json.loads(f.read())
+        run_bot(settings["admin_ids"])
+    except FileNotFoundError:
+        print("ERROR: файл `settings.json` не найден!")
+        initial_setup()
+    except KeyError as e:
+        print(f"ERROR: в файле `settings.json` отсутствуют необходимые поля!")
+        initial_setup()
 
 # TODO: переключение между модельками прямо в чате Telegram
 # TODO: новая моделька в ProxyAPI - Claude
