@@ -6,7 +6,6 @@ from os import getenv
 import aiohttp
 import asyncio
 import json
-from requests import Response
 
 
 class ApiKind(Enum):
@@ -70,7 +69,7 @@ def update_messages(messages: Messages, new_message: str, role: str) -> Messages
 async def send_text_request(user_message: str, messages: Messages, api: ApiKind, api_key: str) -> tuple[str, Messages]:
     new_messages = update_messages(messages, user_message, "user")
     json_data: RequestData = build_request_json(messages)
-    async with aiohttp.ClientSession(trust_env=True) as session:
+    async with aiohttp.ClientSession(trust_env=True, timeout=aiohttp.ClientTimeout(total=30, connect=10)) as session:
         async with session.post(APIs[api], headers=get_headers(api_key), json=json_data) as response:
             match response.status:
                 case 200:
@@ -88,7 +87,7 @@ async def send_transcription_request(filename: str, content, api_key: str) -> st
 
     files = build_audio2text_json(filename, content)
 
-    async with aiohttp.ClientSession(trust_env=True) as session:
+    async with aiohttp.ClientSession(trust_env=True, timeout=aiohttp.ClientTimeout(total=30, connect=10)) as session:
         async with session.post(TRANSCRIPT_URL, headers=get_headers(api_key), data=files) as response:
             return await response.text()
 

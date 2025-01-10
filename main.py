@@ -69,7 +69,7 @@ def run_bot(admin_ids: list[int]) -> None:
     if BOT_TOKEN is None:
         raise ValueError("BOT_TOKEN env var is None.")
 
-    request = telegram.request.HTTPXRequest(connection_pool_size=16)
+    request = telegram.request.HTTPXRequest(connection_pool_size=16, connect_timeout=10, write_timeout=10)
 
     application = ApplicationBuilder()\
         .request(request)\
@@ -89,7 +89,7 @@ def run_bot(admin_ids: list[int]) -> None:
     group_voice_handler = MessageHandler(filters.VOICE & filters.ChatType.GROUPS, ai_voice_with_filters)
     application.add_handler(group_voice_handler)
     
-    application.run_polling()
+    application.run_polling(timeout=30)
 
 def initial_setup() -> None:
     try:
