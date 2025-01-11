@@ -16,6 +16,7 @@ APIs: dict[ApiKind, str] = {
     ApiKind.ProxyAPI: "https://api.proxyapi.ru/openai/v1/chat/completions",
     ApiKind.Groq: "https://api.groq.com/openai/v1/chat/completions",
 }
+TRANSCRIPT_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
 def get_headers(api_key: str) -> dict:
     return {"Authorization": f"Bearer {api_key}"}
@@ -30,14 +31,18 @@ class AiContext:
     api_key: str
     messages: Messages
 
-    async def send_text(self, text: str) -> str:
-        (response, self.messages) = await send_text_request(text, self.messages, self.api, self.api_key)
-        return response
+    def add_user_message(self, text: str) -> None:
+        self.messages = update_messages(self.messages, text, "user")
 
-    async def send_voice(self, content) -> tuple[str, str]:
-        transcription = await send_transcription_request("example.ogg", content, self.api_key)
-        response = await self.send_text(transcription)
-        return (response, transcription)
+    def add_assistant_message(self, text: str) -> None:
+        self.messages = update_messages(self.messages, text, "assistant")
+
+    async def send_text(self) -> str:
+        response = await send_text_request(self.messages, self.api, self.api_key)
+        return response["choices"][0]["message"]["content"]
+
+    async def send_voice(self, content) -> str:
+        return await send_transcription_request("example.ogg", content, self.api_key)
 
 @dataclass
 class DefaultAiContext(AiContext):
@@ -63,28 +68,19 @@ def build_audio2text_json(filename: str, content) -> aiohttp.FormData:
     return files
 
 def update_messages(messages: Messages, new_message: str, role: str) -> Messages:
-    messages.append({"role": role, "content": new_message})
-    return messages
+    new_messages = []
+    new_messages.extend(messages)
+    new_messages.append({"role": role, "content": new_message})
+    return new_messages
 
-async def send_text_request(user_message: str, messages: Messages, api: ApiKind, api_key: str) -> tuple[str, Messages]:
-    new_messages = update_messages(messages, user_message, "user")
+async def send_text_request(messages: Messages, api: ApiKind, api_key: str) -> dict:
     json_data: RequestData = build_request_json(messages)
+
     async with aiohttp.ClientSession(trust_env=True, timeout=aiohttp.ClientTimeout(total=30, connect=10)) as session:
         async with session.post(APIs[api], headers=get_headers(api_key), json=json_data) as response:
-            match response.status:
-                case 200:
-                    response_json: dict = await response.json()
-                case 429:
-                    return ("Я устала :(\nПодожди немного и снова сможешь написать мне. Ня~", messages)
-                case _:
-                    return ("Хрен знает что случилось :/", messages)
-    response_content = response_json["choices"][0]["message"]["content"]
-    new_messages = update_messages(messages, response_content, "assistant")
-    return (response_content, new_messages)
+            return await response.json()
 
 async def send_transcription_request(filename: str, content, api_key: str) -> str:
-    TRANSCRIPT_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
-
     files = build_audio2text_json(filename, content)
 
     async with aiohttp.ClientSession(trust_env=True, timeout=aiohttp.ClientTimeout(total=30, connect=10)) as session:
@@ -100,6 +96,10 @@ if __name__ == "__main__":
     messages: Messages = []
 
     while True:
-        response, messages = asyncio.run(send_text_request(input(">>> "), messages, ApiKind.Groq, API_KEY))
-        print(response)
+        user_input = input(">>> ")
+        messages = update_messages(messages, user_input, "user")
+        response = asyncio.run(send_text_request(messages, ApiKind.Groq, API_KEY))
+        response_text = response["choices"][0]["message"]["content"]
+        messages = update_messages(messages, response_text, "assistant")
+        print(response_text)
 

@@ -27,7 +27,9 @@ async def ai_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global ai_contexts
     id: int = update.effective_message.from_user.id
     ai_context = ai_contexts.setdefault(id, ai.DefaultAiContext())
-    response = await ai_context.send_text(update.effective_message.text)
+    ai_context.add_user_message(update.effective_message.text)
+    response = await ai_context.send_text()
+    ai_context.add_assistant_message(response)
     await context.bot.send_message(chat_id=cast(Chat, update.effective_chat).id, text=response)
 
 async def ai_voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -42,7 +44,9 @@ async def ai_voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global ai_contexts
     id: int = update.message.from_user.id
     ai_context = ai_contexts.setdefault(id, ai.DefaultAiContext())
-    (response, transcription) = await ai_context.send_voice(audio_content)
+    transcription = await ai_context.send_voice(audio_content)
+    ai_context.add_user_message(transcription)
+    response = await ai_context.send_text()
     await context.bot.send_message(chat_id=cast(Chat, update.effective_chat).id, text=f'Ваше сообщение распознано как: "{transcription}"')
     await context.bot.send_message(chat_id=cast(Chat, update.effective_chat).id, text=response)
 
